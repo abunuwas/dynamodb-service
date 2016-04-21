@@ -1,0 +1,51 @@
+
+java -Djava.library.path=./DynamoDBLocal_lib -jar DynamoDBLocal.jar
+
+entryPoint
+migrationsManager 
+databaseSetup
+- createTable
+- deleteTable
+- updateTable
+	- secondaryIndexes
+		- createSecondaryIndex
+		- updateSecondaryIndex
+		- deleteSecondaryIndex
+	- provisionedThroughput
+	- streamSpecification 
+	- localSecondaryIndexes
+metadata
+- listTables
+- tableStatus
+- 
+connection
+- getDatabase
+- getTable 
+tableDescription
+- tableDescription
+CRUD
+- writing 
+	- Insert 1 item
+	- Insert batch
+- reading
+	- Get item
+	- Query
+	- Scan 
+- update
+	- 1 item
+	- Update batch
+- delete 
+	- 1 item
+	- Delete batch 
+tests
+- create table
+- delete table
+- create secondary index
+- 
+
+exceptions
+changesLog
+docs
+
+
+
