@@ -32,5 +32,5 @@ class ConnectionManager:
             self.setupCamerasTable()
         return self.camerasTable
 
-    def createDevicesTable(self):
+    def createDevicesTable(self, table_name):
         self.camerasTable = createDevicesTable(self.db)

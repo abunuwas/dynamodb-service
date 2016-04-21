@@ -50,8 +50,19 @@ def getDynamoDBConnection(config=None, region_name=None, endpoint_url=None, port
         db = boto3.resource('dynamodb', **params)
     return db
 
-def createDevicesTable(db):
+def createTable(table_name, key_schema, attribute_definitions, provisioned_throughput, global_secondary_indexes=None, local_secondary_indexes=None, stream_specification=None):
+	try:
+	    table = db.create_table(
+	    			TableName=table_name,
+	    			KeySchema=key_schema,
+	                AttributeDefinitions=attribute_definitions,
+	                ProvisionedThroughput=provisioned_throughput,
+	                GlobalSecondaryIndexes=global_secondary_indexes,
+	                )
+	except Exception as e:
+		print('The following exception was found {}'.format(repr(e)))
 
+def createSecondaryIndexes():
     try:
         hostStatusDate = GlobalAllIndex("HostId-StatusDate-index",
                                         parts=[HashKey("HostId"), RangeKey("StatusDate")],
@@ -68,23 +79,15 @@ def createDevicesTable(db):
 
         #global secondary indexes
         GSI = [hostStatusDate, opponentStatusDate]
-
-        devicesTable = Table.create("Devices",
-                    schema=[HashKey("DeviceId")],
-                    throughput={
-                        'read': 1,
-                        'write': 1
-                    },
-                    global_indexes=GSI,
-                    connection=db)
-
-    except botocore.JSONResponseError as jre:
-        try:
-            devicessTable = Table("Devices", connection=db)
-        except Exception as e:
-            print("Devices Table doesn't exist.")
+    except:
+    	pass
     finally:
-        return devicesTable
+    	pass
+
+def destroyTable(db, table_name):
+	table = db.table(table_name)
+	table.delete()
+	return True
 
 #parse command line args for credentials and such
 #for now just assume local is when args are empty

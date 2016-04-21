@@ -36,14 +36,19 @@ def db_update():
 def db_destroy():
     return 'destroy' 
 
-@application.route('/table', methods=["GET", "POST"])
-def createTable():
-    cm.createDevicesTable()
+@application.route('/create_table/<table_name>', methods=["GET", "POST"])
+def createTable(table_name):
+    cm.createDevicesTable(table_name)
 
-    while controller.checkIfTableIsActive() == False:
+    while controller.checkIfTableIsActive(table_name) == False:
         time.sleep(3)
 
-    return redirect('/index')
+    return 'create_table %s' % table_name
+
+@application.route('/delete_table/<table_name>', methods=['GET', 'POST'])
+def delete_table(table_name):
+    cm.destroyTable(talbe_name)
+    return True
 
 if __name__ == '__main__':
     """
