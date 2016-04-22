@@ -29,7 +29,11 @@ CRUD
 	- Insert batch
 - reading
 	- Get item
+		Simplest query, only needs the keys of the index. It can also include a ProjectionExpression attribute to specify which attributes we want to obtain from the item that matches the query. If any of the keys attributes names conflicts with the reserved names of Dynamodb, we need to use ExpressionAttributeNames. 
+		If we want the last updated values in the returned set, we need to set ConsistentRead to True. 
+		KeyConditionExpression: for the partition key, on equality test is supported. For the sort key, several comparison tests are supported (eq, between, begins_with, probably also lt, gt). 
 	- Query
+		FilterExpression: begins_with, lt, gt, eq, between. FilterExpression filters the set returned by the key-based query. Because of that, it doesn't consume additional read capacity units. It's applied on non-key attributes of the items. 
 	- Scan 
 - update
 	- 1 item
