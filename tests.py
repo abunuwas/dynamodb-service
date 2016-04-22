@@ -2,13 +2,14 @@ import unittest
 from unittest import TestCase
 
 import boto3
+from boto3.dynamodb.conditions import Key, Attr
 import os
 import json
 import psutil
 
 from databaseSetup import createTable, deleteTable
 from connection import getDatabase, getClient
-from crud import insertItem
+from crud import insertItem, scan, query
 
 
 def check_port(port):
@@ -115,21 +116,25 @@ class TestCRUD(TestCase):
 		self.assertEqual(response_status, 200)
 
 	def test_insert_items_many(self):
-		with open('moviedata.json') as json_file:
-			data = json.load(json_file)
-			response = insertItem(self.table, item, many=True)
-			print(response)
+		response = insertItem(self.table, 'data.json', many=True)
+		params = {'KeyConditionExpression': Key('year').eq(2013) & Key('title').begins_with('R')}
+		table_data = scan(self.table, params)
+		for item in table_data:
+			print(item)
 
 	def test_get_item(self):
 		pass
 
-	def test_get_items_many(self):
+	def test_query(self):
+		pass
+
+	def test_scan(self):
 		pass
 
 	def test_update_item(self):
 		pass
 
-	def test_update_items_many(self):
+	def test_update_many(self):
 		pass
 
 	def test_delete_item(self):
