@@ -17,3 +17,4 @@ def deleteTable(dynamodb, table_name):
 
 def updateTable(dynamodb, table_name, updates):
 	pass
+
