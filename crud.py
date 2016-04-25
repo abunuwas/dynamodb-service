@@ -1,6 +1,50 @@
 import json
 import decimal
 
+
+class QueryResponse:
+	def __init__(self, response):
+		self._raw_data = response
+		metadata = response.get('ResponseMetadata', {})
+		self.request_id = metadata.get('RequestId', None)
+		self.count = response.get('Count', None)
+		self.items = response.get('Items', None)
+		self.status = metadata.get('HTTPStatusCode', None)
+		self.scannedCount = response.get('ScannedCount', None)
+		self.last_evaluated_key = response.get('LastEvaluatedKey', None)
+
+	def __str__(self):
+		return '<Class QueryResponse>'
+
+	def __len__(self):
+		return self.scannedCount
+
+	def __iter__(self):
+		try:
+			for item in self.items:
+				yield item
+
+			while self.last_evaluated_key:
+				yield item
+
+		except Exception as e:
+			print('The following exception was thrown: {}'.format(e))
+
+		
+#if response.items is not None:
+#	print(len(response))
+#	for i in response.items:
+#		yield json.dumps(i, cls=DecimalEncoder)
+#
+#	while response.last_evaluated_key:
+#		resopnse = table.scan(params)
+#		for i in response.items:
+#			yield json.dumps(i, indent=2, cls=DecimalEncoder)
+#
+#else:
+#	return response
+
+
 class DecimalEncoder(json.JSONEncoder):
 	def default(self, o):
 		if isinstance(o, decimal.Decimal):
@@ -12,7 +56,7 @@ class DecimalEncoder(json.JSONEncoder):
 
 
 def loadFromFile(table, file_name):
-	with open(data) as json_file:
+	with open(file_name) as json_file:
 		data = json.load(json_file, parse_float=decimal.Decimal)
 		with table.batch_writer() as batch:
 			for item in data:
@@ -55,7 +99,7 @@ def query(table, params):
 
 	while 'LastEvaluatedKey' in response:
 		resopnse = table.scan(params)
-		for i in response['Items']:
+		for i in response.items:
 			yield json.dumps(i, indent=2, cls=DecimalEncoder)
 
 def scan(table, params):
@@ -66,18 +110,10 @@ def scan(table, params):
 			raise Exception('{} is not a valid query parameter'.format(repr(param)))
 	else:
 		response = table.scan(**params)
+		response = QueryResponse(response)
 
-	if 'Items' in response:
-		for i in response['Items']:
-			yield json.dumps(i, cls=DecimalEncoder)
-
-		while 'LastEvaluatedKey' in response:
-			resopnse = table.scan(params)
-			for i in response['Items']:
-				yield json.dumps(i, indent=2, cls=DecimalEncoder)
-
-	else:
-		print(response['Count'])
+	return response
+		
 
 def updateItem(table, data, many=False):
 	pass
