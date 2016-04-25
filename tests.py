@@ -117,10 +117,17 @@ class TestCRUD(TestCase):
 
 	def test_insert_items_many(self):
 		response = insertItem(self.table, 'data.json', many=True)
-		params = {'TableName': table_model['TableName'], 'Select': 'COUNT'}
+		params = {'TableName': table_model['TableName']}
 		table_data = scan(self.table, params)
 		for item in table_data:
-			print(item)
+			item = eval(item)
+			print(item['title'])
+
+	def test_insert_items_many_count(self):
+		response = insertItem(self.table, 'data.json', many=True)
+		params = {'TableName': table_model['TableName'], 'Select': 'COUNT'}
+		table_data = scan(self.table, params)
+		print(table_data.count)
 
 	def test_get_item(self):
 		pass
