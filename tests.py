@@ -117,7 +117,7 @@ class TestCRUD(TestCase):
 
 	def test_insert_items_many(self):
 		response = insertItem(self.table, 'data.json', many=True)
-		params = {'KeyConditionExpression': Key('year').eq(2013) & Key('title').begins_with('R')}
+		params = {'TableName': table_model['TableName'], 'Select': 'COUNT'}
 		table_data = scan(self.table, params)
 		for item in table_data:
 			print(item)

@@ -10,7 +10,6 @@ class DecimalEncoder(json.JSONEncoder):
 				return int(o)
 			return super(DecimalEncoder, self).default(o)
 
-
 def insertItem(table, data, many=False):
 	if many==False:
 		response = table.put_item(**data)
@@ -60,20 +59,24 @@ def query(table, params):
 
 def scan(table, params):
 	valid_params = ['IndexName', 'FilterExpression', 'ProjectionExpression',
-					'ExpressionAttributeNames']
+					'ExpressionAttributeNames', 'TableName', 'Select']
 	for param in params.keys():
 		if param not in valid_params:
-			raise Exception('{} is not a valid query para meter'.format(param))
+			raise Exception('{} is not a valid query parameter'.format(repr(param)))
 	else:
 		response = table.scan(**params)
 
-	for i in response['Items']:
-		yield json.dumps(i, cls=DecimalEncoder)
-
-	while 'LastEvaluatedKey' in response:
-		resopnse = table.scan(params)
+	if 'Items' in response:
 		for i in response['Items']:
-			yield json.dumps(i, indent=2, cls=DecimalEncoder)
+			yield json.dumps(i, cls=DecimalEncoder)
+
+		while 'LastEvaluatedKey' in response:
+			resopnse = table.scan(params)
+			for i in response['Items']:
+				yield json.dumps(i, indent=2, cls=DecimalEncoder)
+
+	else:
+		print(response['Count'])
 
 def updateItem(table, data, many=False):
 	pass
