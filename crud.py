@@ -10,6 +10,15 @@ class DecimalEncoder(json.JSONEncoder):
 				return int(o)
 			return super(DecimalEncoder, self).default(o)
 
+
+def loadFromFile(table, file_name):
+	with open(data) as json_file:
+		data = json.load(json_file, parse_float=decimal.Decimal)
+		with table.batch_writer() as batch:
+			for item in data:
+				batch.put_item(Item=item)
+		return dir(batch)
+
 def insertItem(table, data, many=False):
 	if many==False:
 		response = table.put_item(**data)
@@ -17,15 +26,7 @@ def insertItem(table, data, many=False):
 	## NEED TRY EXCEPT!!
 	elif many==True:
 		if data.endswith('.json'):
-			# TRY EXCEPT
-			with open(data) as json_file:
-				# TRY EXCEPT
-				data = json.load(json_file, parse_float=decimal.Decimal)
-				with table.batch_writer() as batch:
-					for item in data:
-						# TRY EXCEPT 
-						batch.put_item(Item=item)
-				return dir(batch) # Change return value
+			loadFromFile(table, data)
 		else:
 			# TRY EXCEPT 
 			data = json.load(json_file, parse_float=decimal.Decimal)
