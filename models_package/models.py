@@ -43,11 +43,11 @@ class Model(object):
 		# Modify the following line to account for cases in which we only have a hash key!
 		hash_key, range_key = self.get_required_items()
 		if hash_key and range_key not in self.fields:
-			raise HashRangeKeyError('Either a hash or a range key is missing from your arguments. Your table keys are: {}'.foramt(
+			raise HashRangeKeyError('Either a hash or a range key is missing from your arguments. Your table keys are: {}'.format(
 				self.get_required_items()))
 		for key, value in params:
 			if key not in self.fields:
-				raise FieldError(key, '{} is not a valid field for an item.'format(key))
+				raise FieldError(key, '{} is not a valid field for an item.'.format(key))
 			else:
 
 		self.table.put_item(self.item)
