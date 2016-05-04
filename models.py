@@ -1,3 +1,12 @@
+# Copyright statement
+# License statement
+
+"""
+:module: pynamodb.models
+:author: Jose Antonio Haro Peralta <JHaroPeralta@intamac.com>
+:author: ...
+"""
+
 from collections import namedtuple
 import boto3
 import decimal
@@ -10,6 +19,8 @@ import os
 
 from .exceptions import WrongKeyTypeError, WrongAttributeTypeError, FieldError, HashRangeKeyError
 
+# This dynamodb connection object defined here ad hoc will be removed in the final version. 
+# DynamoDB connection objects should be built from config files or user defined parameters. 
 dynamodb = boto3.resource('dynamodb', region_name='eu-west-1', 
 	endpoint_url="http://localhost:8000")
 
@@ -23,6 +34,7 @@ class DecimalEncoder(json.JSONEncoder):
 				return int(o)
 			return super(DecimalEncoder, self).default(o)
 
+# Not sure yet if a TableModel will be really needed or not. 
 class TableModel:
 	def __init__(self, table_name=None, keys=None, provisioned_throughput=None):
 		self._table_name = table_name
@@ -35,7 +47,14 @@ class TableModel:
 
 
 class Model(object):
+	"""
+	This class provides all the necessary functionality to define a
+	data model for DynamoDB and perform database operations. 
+	"""
 	def __init__(self, **params):
+		"""
+		Class constructor. Parameters can optionally be passed into it. 
+		"""
 		self.params = params
 		self.parameters = {}
 		self.table_name = self.get_table_name()
@@ -46,28 +65,49 @@ class Model(object):
 
 	@classmethod 
 	def get_attributes(cls):
+		"""
+		Class method intended for introspection of attributes defined at class
+		level, usually attributes of the data model. Returns a dictionary mapping
+		class attributes with their values.
+		"""
 		return  cls.__dict__	
 
 	@classmethod
 	def get_required_items(cls):
+		"""
+		Class method that returns a list of the names of the variables that define the index
+		of a DynamoDB table. 
+		"""
 		attributes = cls.get_attributes()
 		required_items = [key for key, value in attributes.items() if isinstance(value, Key)]
 		return required_items
 
 	@classmethod
 	def get_table_name(cls):
+		"""
+		Class method to obtain the name of the DynamoDB table. The table name can be
+		explicitly defined by the user in the data model definition of the table, by 
+		setting a variable `table_name` as a class attribute. If such attribute is 
+		missing, this method assumes that the table name corresponds to the class name.
+		"""
 		return cls.get_attributes().get('table_name', cls.__name__)
 
 	@classmethod
 	def create_table(cls):
+		"""
+		Class method that creates a DynamoDB table based on the attribute definitions
+		specified by the user in the data model. 
+		"""
 		# CONSIDER CASE IN WHICH TABLE ALREADY EXISTS AND ONLY HAS TO BE UPDATED!!!! 
 
 		# For some of the attributes defined in the table we might need additional checks, which might 
 		# justify moving the logic into a TableModel class to build it. 
 
+		# Allowed parameters for the creation of a table in the AWS API. 
 		table_attributes = ['TableName', 'KeySchema', 'AttributeDefinitions', 'ProvisionedThroughput', 'GlobalSecondaryIndexes', 
 		'LocalSecondaryIndexes', 'StreamSpecification']
 
+		# Dictionary setting initial values for the minimum required parameters in the creation of a table. 
 		table_model = {
 						'TableName': None,
 						'KeySchema': [],
@@ -103,16 +143,27 @@ class Model(object):
 			table_model['KeySchema'].append(schema)
 			table_model['AttributeDefinitions'].append(definitions)
 
+		# Keep a migration JSON file log of the table operation performed. 
+		# Check first that there're no name conflicts with the file names!! 
 		with open(os.path.join('migration_logs', 'migration.json'), 'w') as json_file:
 			json.dump(table_model, json_file, indent=4)
 		print('Migration file completed')
 
+		# TODO: build a useful response object, not just a map as returned by the SDK. 
 		response = dynamodb.create_table(**table_model)
 
 		return response
 
 	@classmethod
 	def get_table(cls):
+		"""
+		Class method that returns an object representation of the DynamoDB table corresponding
+		with the class upon which it is invoked. The method provided by the Python SDK actually
+		returns an abstract resource identifier, which does not necessarily correspond with an
+		existing table. For this reason, the present method performs a check to verify that the table
+		exists by trying to access one of its attributes. If this operation throws an error, it is
+		assumed that the table does not exist and a new table is created. 
+		"""
 		table_name = cls.get_table_name()
 		resource_identifier = dynamodb.Table(table_name)
 		try:
@@ -120,34 +171,60 @@ class Model(object):
 		except ClientError:
 			cls.create_table()
 			resource_identifier = dynamodb.Table(table_name)
-			#print('A Client Error was raised')
-			#sys.exit()
 		return resource_identifier
 
 	def build_params(self, item, required_items, params):
+		"""
+		Helper method to build the parameters of an item insertion request in DynamoDB. 
+
+		:param item:
+			A container object where the parameters will be stored.
+		:type item:
+			`dict`. 
+		:param required_items:
+			A list of items that must be present in the item container.
+		:type item:
+			`list`. 
+		"""
 		for i in required_items:
 			item['Item'][i] = params[i]
 		return item
 
 	def create(self, **params):
+		"""
+		Object method to perform an item insertation operation in a DynamoDB table. 
+
+		:param params:
+			A map of values to be used in the item insertion operation. 
+		:type params:
+			`dict`. 
+		"""
+
 		# I think that there should also be the possibility of calling this method as a class method,
 		# like Class.create(hash_key=HASH_KEY, range_key=RANGE_KEY)
 		# Should we have perhaps an objects manager to deal with these things? 
 		# The object manager would build an instance of the class to call all of these especial methods...
+
+		# List of allowed parameters that can be used in an item insertion operation in a DynamoDB table. 
 		fields = ['ConditionExpression', 'ExpressionAttributeNames', 'ExpressionAttributeValues',
 					'Item', 'ReturnConsumedCapacity', 'ReturnItemCollectionMetrics', 'ReturnValues', 'TableName']
 		required_items = self.get_required_items()
+
+		# Dictionary setting initial values for the minimum required parameters in an item insertion operation. 
 		item = {
 			'Item': {}
 		}
+
+		# Build the request from parameters passed directly to this method... 
 		if params:
 			item = self.build_params(item, required_items, params)
+		# ...or from parameters passed into the class constructor method. 
 		else:
 			item = self.build_params(item, required_items, self.params)
-		#print(item)
 		# Wrap next line in ClientError try-except for possible error in the use of data types.
-		#print(self.table)
 		response = self.table.put_item(**item)
+		# Return a JSON representation of the response returned by this transaction. 
+		# TODO: build a useful object representation from this map. 
 		return json.dumps(response, indent=4, cls=DecimalEncoder)
 		#self.table.put_item(self.item)
 
@@ -157,6 +234,16 @@ class Model(object):
 
 	@classmethod
 	def get(cls, **params):
+		"""
+		Class method for querying individual items in a DynamoDB table. 
+
+		:param params:
+			A map of values to be used in the query operation. 
+		:type params:
+			`dict`. 
+		"""
+
+		# List of allowed parameters that can be used in an item query operation in a DynamoDB table. 
 		fields = ['Key', 'TableName', 'ConsistentRead', 'ExpressionAttributeNames', 'ProjectionExpression',
 					'ReturnConsumedCapacity']
 		
@@ -167,6 +254,7 @@ class Model(object):
 				raise Exception 
 		table = cls.get_table()
 
+		# Dictionary setting initial values for the minimum required parameters in an item query operation. 
 		item = {
 			'Key': {}
 		}
@@ -174,14 +262,29 @@ class Model(object):
 		for i in required_items:
 			item['Key'][i] = params[i]
 		response = table.get_item(**item)
+
+		# Return a JSON representation of the response returned by this transaction. 
+		# TODO: build a useful object representation from this map. 
 		return json.dumps(response, indent=4, cls=DecimalEncoder)
 		
 	@classmethod
 	def query(cls, **params):
+		"""
+		Class method that implements a layer of abstraction on the bare wrapper for the query operator 
+		of DynamoDB provided by the Python SDK. 
+
+		:param params:
+			A map of values to be used in the query operation. 
+		:type params:
+			`dict`. 
+		"""
+
+		# List of allowed parameters that can be used in a query transaction in a DynamoDB table. 
 		fields = ['TableName', 'ConsistentRead', 'ExclusiveStartKey', 'ExpressionAttributeNames', 'ExpressionAttributeValues',
 					'FilterExpression', 'IndexName', 'KeyConditionExpression', 'Limit', 'ProjectionExpression',
 					'ReturnConsumedCapacity', 'ScanIndexForward', 'Select']
 
+		# Dictionary setting initial values for the minimum required parameters in a query transaction. 
 		query = {
 			'KeyConditionExpression': '',
 			'ExpressionAttributeNames': {},
@@ -189,6 +292,11 @@ class Model(object):
 		}
 
 		required_items = cls.get_required_items()
+
+		# TODO:	implement support for all the possible logical comparisons that can be performed on the 
+		# condition expressions for the table keys. To do this the interface that will be used to 
+		# reference the logical operators must be first defined. In the code below there's support only
+		# for the equality operator. 
 		for i in required_items:
 			try:
 				attr_name = '#'+i
@@ -205,7 +313,18 @@ class Model(object):
 		return json.dumps(response, indent=4, cls=DecimalEncoder)
 
 	def scan(self, **params):
-		pass
+		"""
+		Class method that implements a layer of abstraction on the bare wrapper for the scan operator 
+		of DynamoDB provided by the Python SDK. 
+
+		:param params:
+			A map of values to be used in the query operation. 
+		:type params:
+			`dict`. 
+		"""
+
+		# List of allowed parameters that can be used in a scan transaction in a DynamoDB table. 
+		fields = []
 
 	def update(self):
 		pass
@@ -215,7 +334,30 @@ class Model(object):
 	
 
 class Key:
-	def __init__(self, name=None, key_type=None, attr_type=None):
+	"""
+	This class builds an object representation of a key parameter in the creation of an index for a
+	DynamoDB table. 
+	"""
+
+	def __init__(self, , key_type, attr_type, name=None):
+		"""
+		Class constructor. The values fetched within this scope are aimed for internal use, therefore 
+		their trailing slash. The intended public interface for these attributes is defined below
+		with property decorators. 
+
+		:param key_type:
+			Type of the DynamoDB index key. Only two values are allowed: `hash` or `range`.
+		:type key_type:
+			`str`.
+		:param attr_type:
+			Data type of the key. Only one of the following values is allowed: `S | N | B`. 
+		:type attr_type:
+			`str`.
+		:para name:
+			Name of the DynamoDB index key. 
+		:type name:
+			`str`. 
+		"""
 		self._name = name
 		self._key_type = key_type
 		self._attr_type = attr_type
@@ -233,12 +375,17 @@ class Key:
 
 	@property
 	def attr_type(self):
-		if self._attr_type in ['N', 'S']: # Make sure there are no more types; I thnink there are! 
+		if self._attr_type in ['N', 'S', 'B']: # Make sure there are no more types. 
 			return self._attr_type
 		else:
 			raise WrongAttributeTypeError(_attr_type, '{} is not a valid attribute type. Valid types are N and S'.format(_attr_type))
 
 	def get_values(self):
+		"""
+		This method builds a named tuple representation of the definition of the DynamoDb talbe index. 
+		A named tuple is preferred over mere map of values since it allows for a more convenient way 
+		of accessing this data with namespacing instead of using heavly nested index notation. 
+		"""
 		Attributes = namedtuple('Attributes', ['KeySchema', 'AttributeDefinitions'])
 		schema = {
 					'AttributeName': self.name,
@@ -254,12 +401,29 @@ class Key:
 		return attributes
 
 class Throughput:
+		"""
+		This class builds an object representation of the throughput capacity of a DynamoDB table for its creation. 
+		###TODO: define default values!
+
+		:param read:
+			Read throughput capacity. 
+		:type read:
+			`int`.
+		:param write:
+			Write throughput capacity. 
+		:type write:
+			`int`.
+		"""
 	### INCLUDE CHECKS!!
 	def __init__(self, read=None, write=None):
 		self.read = read
 		self.write = write
 
 	def get_values(self):
+		"""
+		This method returns a dictionary with the required format for the definition of throughput capacity
+		in a table creation operation in DynamoDB. 
+		"""
 		return {
 					'ReadCapacityUnits': self.read,
 					'WriteCapacityUnits': self.write
