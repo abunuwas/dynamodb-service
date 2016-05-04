@@ -4,6 +4,9 @@ import decimal
 import json
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key as ConditionKey, Attr
+import sys
+import inspect
+import os
 
 from .exceptions import WrongKeyTypeError, WrongAttributeTypeError, FieldError, HashRangeKeyError
 
@@ -30,6 +33,69 @@ class TableModel:
 	def table_name(self):
 	    return self._table_name
 
+def model_constructor(model):
+	# CONSIDER CASE IN WHICH TABLE ALREADY EXISTS AND ONLY HAS TO BE UPDATED!!!! 
+
+	# For some of the attributes defined in the table we might need additional checks, which might 
+	# justify moving the logic into a TableModel class to build it. 
+	table_attributes = ['TableName', 'KeySchema', 'AttributeDefinitions', 'ProvisionedThroughput', 'GlobalSecondaryIndexes', 
+						'LocalSecondaryIndexes', 'StreamSpecification']
+	table_model = {
+					'TableName': None,
+					'KeySchema': [],
+					'AttributeDefinitions': [],
+					'ProvisionedThroughput': None
+				}
+
+	#model = obj.__call__() # obj() also works, but I think this syntax is more explicit. 
+	attributes = model.get_attributes()
+	table_name = attributes.get('table_name', model.__class__)
+	provisioned_throughput = attributes.get('provisioned_throughput', Throughput(read=5, write=5))
+	keys = [(key, value) for key, value in attributes.items() if isinstance(value, Key)]
+	# Keys must be listed in order when creating a table in DynamoDB. Hash key must come first, 
+	# and RANGE key second, if any. The sorting method used here is not very good, since it
+	# relies on alphabetical order on the one hand, and on the other hand the key referrencing 
+	# method is very specific to the API implemented in this framework, which makes it prone to
+	# code breaks with small changes. Improve this later. 
+	keys = sorted(keys, key=lambda key: key[1].get_values().KeySchema['KeyType'])
+
+	table_model['TableName'] = table_name
+	table_model['ProvisionedThroughput'] = provisioned_throughput.get_values()
+
+	for key, value in keys:
+		values = value.get_values()
+
+		schema = values.KeySchema
+		definitions = values.AttributeDefinitions
+
+		attr_name = schema.get('AttrbuteName', key)
+
+		schema['AttributeName'] = attr_name
+		definitions['AttributeName'] = attr_name
+
+		table_model['KeySchema'].append(schema)
+		table_model['AttributeDefinitions'].append(definitions)
+
+	return table_model
+
+def makemigrations():
+	class_models = []
+	table_models = []
+	for name, obj in inspect.getmembers(models, inspect.isclass):
+		# HORROR!!!!!!!!!!! CHANGE THIS ASAP!!!!!!!!!!
+		if 'models_package' not in repr(obj):
+			class_models.append(obj)
+
+	for obj in class_models:
+		table_model = model_constructor(obj)
+		table_models.append(table_model)
+
+	with open(os.path.join('migration_logs', 'migration.json'), 'w') as json_file:
+		json.dump(table_models, json_file, indent=4)
+	print('Migration file completed')
+	# log()
+
+
 class Model(object):
 	def __init__(self, **params):
 		self.params = params
@@ -55,21 +121,94 @@ class Model(object):
 		return cls.get_attributes().get('table_name', cls.__name__)
 
 	@classmethod
+	def create_table(cls):
+		# CONSIDER CASE IN WHICH TABLE ALREADY EXISTS AND ONLY HAS TO BE UPDATED!!!! 
+
+		# For some of the attributes defined in the table we might need additional checks, which might 
+		# justify moving the logic into a TableModel class to build it. 
+
+		table_attributes = ['TableName', 'KeySchema', 'AttributeDefinitions', 'ProvisionedThroughput', 'GlobalSecondaryIndexes', 
+		'LocalSecondaryIndexes', 'StreamSpecification']
+
+		table_model = {
+						'TableName': None,
+						'KeySchema': [],
+						'AttributeDefinitions': [],
+						'ProvisionedThroughput': None
+					}
+
+		attributes = cls.get_attributes()
+		table_name = cls.get_table_name()
+		provisioned_throughput = attributes.get('provisioned_throughput', Throughput(read=5, write=5))
+		keys = [(key, value) for key, value in attributes.items() if isinstance(value, Key)]
+		# Keys must be listed in order when creating a table in DynamoDB. Hash key must come first, 
+		# and RANGE key second, if any. The sorting method used here is not very good, since it
+		# relies on alphabetical order on the one hand, and on the other hand the key referrencing 
+		# method is very specific to the API implemented in this framework, which makes it prone to
+		# code breaks with small changes. Improve this later. 
+		keys = sorted(keys, key=lambda key: key[1].get_values().KeySchema['KeyType'])
+
+		table_model['TableName'] = table_name
+		table_model['ProvisionedThroughput'] = provisioned_throughput.get_values()
+
+		for key, value in keys:
+			values = value.get_values()
+
+			schema = values.KeySchema
+			definitions = values.AttributeDefinitions
+
+			attr_name = schema.get('AttrbuteName', key)
+
+			schema['AttributeName'] = attr_name
+			definitions['AttributeName'] = attr_name
+
+			table_model['KeySchema'].append(schema)
+			table_model['AttributeDefinitions'].append(definitions)
+
+		with open(os.path.join('migration_logs', 'migration.json'), 'w') as json_file:
+			json.dump(table_model, json_file, indent=4)
+		print('Migration file completed')
+
+		response = dynamodb.create_table(**table_model)
+
+		return response
+
+	@classmethod
 	def get_table(cls):
 		table_name = cls.get_table_name()
-		return dynamodb.Table(table_name)
+		resource_identifier = dynamodb.Table(table_name)
+		try:
+			resource_identifier.table_status
+		except ClientError:
+			cls.create_table()
+			resource_identifier = dynamodb.Table(table_name)
+			#print('A Client Error was raised')
+			#sys.exit()
+		return resource_identifier
+
+	def build_params(self, item, required_items, params):
+		for i in required_items:
+			item['Item'][i] = params[i]
+		return item
 
 	def create(self, **params):
+		# I think that there should also be the possibility of calling this method as a class method,
+		# like Class.create(hash_key=HASH_KEY, range_key=RANGE_KEY)
+		# Should we have perhaps an objects manager to deal with these things? 
+		# The object manager would build an instance of the class to call all of these especial methods...
 		fields = ['ConditionExpression', 'ExpressionAttributeNames', 'ExpressionAttributeValues',
 					'Item', 'ReturnConsumedCapacity', 'ReturnItemCollectionMetrics', 'ReturnValues', 'TableName']
 		required_items = self.get_required_items()
 		item = {
 			'Item': {}
 		}
-		for i in required_items:
-			item['Item'][i] = self.params[i]
-		print(item)
+		if params:
+			item = self.build_params(item, required_items, params)
+		else:
+			item = self.build_params(item, required_items, self.params)
+		#print(item)
 		# Wrap next line in ClientError try-except for possible error in the use of data types.
+		#print(self.table)
 		response = self.table.put_item(**item)
 		return json.dumps(response, indent=4, cls=DecimalEncoder)
 		#self.table.put_item(self.item)
@@ -106,24 +245,26 @@ class Model(object):
 					'ReturnConsumedCapacity', 'ScanIndexForward', 'Select']
 
 		query = {
-			'KeyConditionExpression': {},
-			'ExpressionAttributeNames': { '#y': 'year' },
-			'ExpressionAttributeValues': { ':year': 2005 }
+			'KeyConditionExpression': '',
+			'ExpressionAttributeNames': {},
+			'ExpressionAttributeValues': {}
 		}
 
 		required_items = cls.get_required_items()
 		for i in required_items:
 			try:
-				query['KeyConditionExpression'] = '#y'+' = :year' #ConditionKey(i).eq(params[i])
+				attr_name = '#'+i
+				attr_value = ':'+i
+				query['ExpressionAttributeValues'][attr_value] = params[i]
+				query['ExpressionAttributeNames'][attr_name] = i
+				query['KeyConditionExpression'] += attr_name+'='+attr_value
 			except KeyError:
 				continue
 
-		print(query)
-
-
 		table = cls.get_table()
 		response = table.query(**query)
-		return response
+
+		return json.dumps(response, indent=4, cls=DecimalEncoder)
 
 	def scan(self, **params):
 		pass
