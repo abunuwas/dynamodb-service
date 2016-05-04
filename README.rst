@@ -31,7 +31,7 @@ Alternatively, migrations can be performed manually from the command line with t
 following commands:
 
 
-.. code=block:: python
+.. code-block:: python
     
     python3 manage.py makemigrations
     python3 manage.py migrate
