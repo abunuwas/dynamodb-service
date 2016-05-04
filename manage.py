@@ -5,7 +5,7 @@ import boto3
 import decimal
 
 import models
-from models_package.models import Model, Throughput, Key
+from models import Model, Throughput, Key
 
 def model_constructor(obj):
 	# CONSIDER CASE IN WHICH TABLE ALREADY EXISTS AND ONLY HAS TO BE UPDATED!!!! 
