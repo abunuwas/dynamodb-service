@@ -2,29 +2,6 @@ import json
 import decimal
 
 
-#if response.items is not None:
-#	print(len(response))
-#	for i in response.items:
-#		yield json.dumps(i, cls=DecimalEncoder)
-#
-#	while response.last_evaluated_key:
-#		resopnse = table.scan(params)
-#		for i in response.items:
-#			yield json.dumps(i, indent=2, cls=DecimalEncoder)
-#
-#else:
-#	return response
-
-
-class DecimalEncoder(json.JSONEncoder):
-	def default(self, o):
-		if isinstance(o, decimal.Decimal):
-			if o % 1 > 0:
-				return float(o)
-			else:
-				return int(o)
-			return super(DecimalEncoder, self).default(o)
-
 
 def loadFromFile(table, file_name):
 	with open(file_name) as json_file:
