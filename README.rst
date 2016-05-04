@@ -12,7 +12,7 @@ Example of model definition
 ---------------------------
 The following lines of code define a data model for a DynamoDB table:
 
-.. code=block:: python
+.. code-block:: python
 
 	from pynamodb.models import Model, Key, Throughput
 
