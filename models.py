@@ -1,10 +1,24 @@
 from collections import namedtuple
 import boto3
+import decimal
+import json
+from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Key as ConditionKey, Attr
 
 from .exceptions import WrongKeyTypeError, WrongAttributeTypeError, FieldError, HashRangeKeyError
 
 dynamodb = boto3.resource('dynamodb', region_name='eu-west-1', 
 	endpoint_url="http://localhost:8000")
+
+# Helper class to convert DynamoDB item to JSON
+class DecimalEncoder(json.JSONEncoder):
+	def default(self, o):
+		if isinstance(o, decimal.Decimal):
+			if o % 1 > 0:
+				return float(o)
+			else:
+				return int(o)
+			return super(DecimalEncoder, self).default(o)
 
 class TableModel:
 	def __init__(self, table_name=None, keys=None, provisioned_throughput=None):
@@ -17,12 +31,11 @@ class TableModel:
 	    return self._table_name
 
 class Model(object):
-	def __init__(self, params=None):
+	def __init__(self, **params):
+		self.params = params
 		self.parameters = {}
-		self.fields = ['ConditionExpression', 'ExpressionAttributeNames', 'ExpressionAttributeValues',
-				'Item', 'ReturnConsumedCapacity', 'ReturnItemCollectionMetrics', 'ReturnValues', 'TableName']
 		self.table_name = self.get_table_name()
-		self.table = dynamodb.Table(self.table_name)
+		self.table = self.get_table()
 
 	def __repr__(self):
 		return '<Model object: {}>'.format(self.get_attributes())
@@ -31,34 +44,86 @@ class Model(object):
 	def get_attributes(cls):
 		return  cls.__dict__	
 
-	def get_table_name(self):
-		return self.get_attributes().get('table_name', self.__class__)
-
-	def get_required_items(self):
-		attributes = self.get_attributes()
+	@classmethod
+	def get_required_items(cls):
+		attributes = cls.get_attributes()
 		required_items = [key for key, value in attributes.items() if isinstance(value, Key)]
 		return required_items
 
+	@classmethod
+	def get_table_name(cls):
+		return cls.get_attributes().get('table_name', cls.__name__)
+
+	@classmethod
+	def get_table(cls):
+		table_name = cls.get_table_name()
+		return dynamodb.Table(table_name)
+
 	def create(self, **params):
+		fields = ['ConditionExpression', 'ExpressionAttributeNames', 'ExpressionAttributeValues',
+					'Item', 'ReturnConsumedCapacity', 'ReturnItemCollectionMetrics', 'ReturnValues', 'TableName']
 		required_items = self.get_required_items()
-		fields = [key for key, value in params]
-		# Modify the following line to account for cases in which we only have a hash key!
-		hash_key, range_key = self.get_required_items()
-		if hash_key and range_key not in self.fields:
-			raise HashRangeKeyError('Either a hash or a range key is missing from your arguments. Your table keys are: {}'.format(
-				self.get_required_items()))
-		for key, value in params:
-			if key not in self.fields:
-				raise FieldError(key, '{} is not a valid field for an item.'.format(key))
-			else:
+		item = {
+			'Item': {}
+		}
+		for i in required_items:
+			item['Item'][i] = self.params[i]
+		print(item)
+		# Wrap next line in ClientError try-except for possible error in the use of data types.
+		response = self.table.put_item(**item)
+		return json.dumps(response, indent=4, cls=DecimalEncoder)
+		#self.table.put_item(self.item)
 
-		self.table.put_item(self.item)
+	def save(self):
+		# Perhaps at some point this might be a useful method...
+		pass 
 
-	def get(self, **params):
-		pass
+	@classmethod
+	def get(cls, **params):
+		fields = ['Key', 'TableName', 'ConsistentRead', 'ExpressionAttributeNames', 'ProjectionExpression',
+					'ReturnConsumedCapacity']
+		
+		required_items = cls.get_required_items()
+		for item in required_items:
+			if item not in params.keys():
+				# Raise a more helpful exception
+				raise Exception 
+		table = cls.get_table()
 
-	def query(self, **params):
-		pass
+		item = {
+			'Key': {}
+		}
+		#Before doing this loop, it must be first checked that the required items are in params
+		for i in required_items:
+			item['Key'][i] = params[i]
+		response = table.get_item(**item)
+		return json.dumps(response, indent=4, cls=DecimalEncoder)
+		
+	@classmethod
+	def query(cls, **params):
+		fields = ['TableName', 'ConsistentRead', 'ExclusiveStartKey', 'ExpressionAttributeNames', 'ExpressionAttributeValues',
+					'FilterExpression', 'IndexName', 'KeyConditionExpression', 'Limit', 'ProjectionExpression',
+					'ReturnConsumedCapacity', 'ScanIndexForward', 'Select']
+
+		query = {
+			'KeyConditionExpression': {},
+			'ExpressionAttributeNames': { '#y': 'year' },
+			'ExpressionAttributeValues': { ':year': 2005 }
+		}
+
+		required_items = cls.get_required_items()
+		for i in required_items:
+			try:
+				query['KeyConditionExpression'] = '#y'+' = :year' #ConditionKey(i).eq(params[i])
+			except KeyError:
+				continue
+
+		print(query)
+
+
+		table = cls.get_table()
+		response = table.query(**query)
+		return response
 
 	def scan(self, **params):
 		pass
