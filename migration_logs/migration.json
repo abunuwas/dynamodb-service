@@ -1,1 +1,0 @@
-[{"KeySchema": [{"KeyType": "HASH", "AttributeName": "year"}, {"KeyType": "RANGE", "AttributeName": "title"}], "TableName": "Camera", "ProvisionedThroughput": {"ReadCapacityUnits": 10, "WriteCapacityUnits": 10}, "AttributeDefinitions": [{"AttributeType": "N", "AttributeName": "year"}, {"AttributeType": "N", "AttributeName": "title"}]}]

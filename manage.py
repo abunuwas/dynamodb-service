@@ -8,7 +8,7 @@ import models
 from models_package.models import Model, Throughput, Key
 
 def model_constructor(obj):
-	# CONSIDER CASE IN WHICH TABLE ALREADY EXISTS AND ONLY HAS TO BE UPDATED!!!! THIS IS HUGELY IMPORTANT!!
+	# CONSIDER CASE IN WHICH TABLE ALREADY EXISTS AND ONLY HAS TO BE UPDATED!!!! 
 
 	# For some of the attributes defined in the table we might need additional checks, which might 
 	# justify moving the logic into a TableModel class to build it. 
@@ -77,7 +77,7 @@ def makemigrations():
 		table_models.append(table_model)
 
 	with open(os.path.join('migration_logs', 'migration.json'), 'w') as json_file:
-		json.dump(table_models, json_file)
+		json.dump(table_models, json_file, indent=4)
 	print('Migration file completed')
 	# log()
 

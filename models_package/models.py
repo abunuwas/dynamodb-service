@@ -24,10 +24,12 @@ class Model(object):
 		self.table_name = self.get_table_name()
 		self.table = dynamodb.Table(self.table_name)
 
+	def __repr__(self):
+		return '<Model object: {}>'.format(self.get_attributes())
 
 	@classmethod 
 	def get_attributes(cls):
-		return  cls.__dict__
+		return  cls.__dict__	
 
 	def get_table_name(self):
 		return self.get_attributes().get('table_name', self.__class__)
@@ -53,6 +55,12 @@ class Model(object):
 		self.table.put_item(self.item)
 
 	def get(self, **params):
+		pass
+
+	def query(self, **params):
+		pass
+
+	def scan(self, **params):
 		pass
 
 	def update(self):
