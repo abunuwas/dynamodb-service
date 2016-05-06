@@ -1,3 +1,4 @@
+========
 PynamoDB
 ========
 PynamoDB is a layer of abstraction over the Python SDK wrapper for AWS DynamoDB. 
@@ -23,10 +24,58 @@ The following lines of code define a data model for a DynamoDB table:
 		provisioned_throughput = Throughput(read=10, write=10)
 
 To create a table, it is enough to instantiate the class and start performing
-database transactions with it. PynamoDB will the information available from within
+database transactions with it. PynamoDB will use the information available from within
 the class definition to obtain an object representation of the table corresponding
 with this class. If a table is not found, PynamoDB creates it automatically. 
 
+Database transactions
+--------------------
+
+Insert an item into a table
+```````````````````````````
+
+camera = Camera(year=2005, title=2)
+camera.create()
+
+or
+
+camera.create(year=2005, title=3)
+
+-- TODO: batchwrite
+
+Query interface
+``````````````
+
+Get item
+''''''''
+
+Camera.get(year=2005, title=2)
+
+Query
+'''''
+
+Camera.query(year=2005)
+
+-- TODO: implement support for conditional queries. 
+
+Scan
+''''
+
+-- STILL TODO
+
+Camera.scan()
+
+Update an item
+``````````````
+
+Delete an item
+``````````````
+
+Update the table model
+----------------------
+
+Command line interface
+---------------------
 Alternatively, migrations can be performed manually from the command line with the 
 following commands:
 
