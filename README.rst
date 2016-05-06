@@ -34,12 +34,16 @@ Database transactions
 Insert an item into a table
 ```````````````````````````
 
-camera = Camera(year=2005, title=2)
-camera.create()
+.. code-block:: python
+
+	camera = Camera(year=2005, title=2)
+	camera.create()
 
 or
 
-camera.create(year=2005, title=3)
+.. code-block:: python
+
+	camera.create(year=2005, title=3)
 
 -- TODO: batchwrite
 
@@ -49,12 +53,16 @@ Query interface
 Get item
 ''''''''
 
-Camera.get(year=2005, title=2)
+.. code-block:: python
+
+	Camera.get(year=2005, title=2)
 
 Query
 '''''
 
-Camera.query(year=2005)
+.. code-block:: python
+
+	Camera.query(year=2005)
 
 -- TODO: implement support for conditional queries. 
 
@@ -63,7 +71,9 @@ Scan
 
 -- STILL TODO
 
-Camera.scan()
+.. code-block:: python
+
+	Camera.scan()
 
 Update an item
 ``````````````
